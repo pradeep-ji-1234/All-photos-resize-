@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Assistant & Govt Form Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
+        .container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); width: 100%; max-width: 500px; text-align: center; border-top: 8px solid #007bff; }
+        h2 { color: #007bff; margin-bottom: 5px; }
+        .search-area { margin-bottom: 20px; }
+        input[type="text"] { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; transition: 0.3s; }
+        input[type="text"]:focus { border-color: #007bff; }
+        .info-status { background: #d4edda; color: #155724; padding: 12px; border-radius: 8px; margin: 10px 0; display: none; font-weight: bold; font-size: 14px; }
+        input[type="file"] { margin: 15px 0; }
+        .btn-main { background: #007bff; color: white; border: none; padding: 18px; width: 100%; border-radius: 10px; cursor: pointer; font-size: 18px; font-weight: bold; margin-top: 10px; }
+        #preview-canvas { margin: 20px auto; border: 2px dashed #007bff; display: none; max-width: 100%; }
+        .download-box { display: none; margin-top: 25px; padding: 20px; background: #f8f9fa; border-radius: 12px; }
+        .btn-download { text-decoration: none; color: white; padding: 12px; border-radius: 8px; display: block; margin: 10px 0; font-weight: bold; font-size: 15px; }
+        .jpg-color { background: #28a745; }
+        .pdf-color { background: #dc3545; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🔬 Lab Assistant Tool</h2>
+    <p>Form ka naam likhein (Jaise: Lab Assistant, SSC, UP Police)</p>
+    
+    <div class="search-area">
+        <input type="text" id="userInput" placeholder="Yahan likhein: Lab Assistant..." oninput="findForm()">
+        <div id="status" class="info-status"></div>
+    </div>
+
+    <input type="file" id="photoInput" accept="image/*">
+    
+    <input type="hidden" id="wVal">
+    <input type="hidden" id="hVal">
+    <input type="hidden" id="kbVal">
+
+    <button class="btn-main" onclick="generateFiles()">Photo & PDF Taiyaar Karein</button>
+    
+    <canvas id="preview-canvas"></canvas>
+    
+    <div class="download-box" id="downloadBox">
+        <p id="sizeInfo" style="font-weight: bold; color: #155724;"></p>
+        <a id="jpgDown" class="btn-download jpg-color">Download Photo (JPG)</a>
+        <div class="btn-download pdf-color" onclick="downloadPDF()">Download as PDF</div>
+    </div>
+</div>
+
+<script>
+    const { jsPDF } = window.jspdf;
+
+    // Database for automatic selection
+    const formsDB = {
+        "lab assistant": { w: 413, h: 531, kb: 50, msg: "Lab Assistant: 3.5x4.5cm, 50KB Limit Set!" },
+        "laboratory": { w: 413, h: 531, kb: 50, msg: "Laboratory Assistant: Size Set!" },
+        "ssc": { w: 413, h: 531, kb: 50, msg: "SSC Size Set!" },
+        "up police": { w: 413, h: 531, kb: 50, msg: "UP Police Size Set!" },
+        "pancard": { w: 295, h: 413, kb: 30, msg: "PAN Card Size Set!" }
+    };
+
+    function findForm() {
+        const text = document.getElementById('userInput').value.toLowerCase();
+        const status = document.getElementById('status');
+        let found = false;
+
+        for (let key in formsDB) {
+            if (text.includes(key)) {
+                document.getElementById('wVal').value = formsDB[key].w;
+                document.getElementById('hVal').value = formsDB[key].h;
+                document.getElementById('kbVal').value = formsDB[key].kb;
+                status.innerText = "✅ " + formsDB[key].msg;
+                status.style.display = "block";
+                found = true;
+                break;
+            }
+        }
+        if(!found) status.style.display = "none";
+    }
+
+    let finalImg = "";
+
+    function generateFiles() {
+        const file = document.getElementById('photoInput').files[0];
+        const w = parseInt(document.getElementById('wVal').value) || 413;
+        const h = parseInt(document.getElementById('hVal').value) || 531;
+        const maxKb = parseInt(document.getElementById('kbVal').value) || 50;
+
+        if (!file) { alert("Pehle photo select karein!"); return; }
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = function(e) {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = function() {
+                const canvas = document.getElementById('preview-canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = w; canvas.height = h;
+                ctx.drawImage(img, 0, 0, w, h);
+                
+                let q = 0.9;
+                finalImg = canvas.toDataURL('image/jpeg', q);
+                // Size compression loop
+                while ((finalImg.length * 0.75) / 1024 > maxKb && q > 0.1) {
+                    q -= 0.05;
+                    finalImg = canvas.toDataURL('image/jpeg', q);
+                }
+
+                document.getElementById('sizeInfo').innerText = "Final Size: " + Math.round((finalImg.length * 0.75)/1024) + " KB";
+                document.getElementById('jpgDown').href = finalImg;
+                document.getElementById('jpgDown').download = "LabAssistant_Photo.jpg";
+                canvas.style.display = "block";
+                document.getElementById('downloadBox').style.display = "block";
+            }
+        }
+    }
+
+    function downloadPDF() {
+        const pdf = new jsPDF();
+        pdf.setFontSize(16);
+        pdf.text("Application Document", 15, 20);
+        pdf.addImage(finalImg, 'JPEG', 15, 30, 40, 50);
+        pdf.save("Lab_Assistant_Form.pdf");
+    }
+</script>
+
+</body>
+</html>
